@@ -30,7 +30,7 @@ function App() {
 
   const [targetIp, setTargetIp] = useState('');
   const [targetPort, setTargetPort] = useState<number>(3000);
-  const [, setTargetName] = useState('');
+  const [targetName, setTargetName] = useState('');
 
   const [msgToSend, setMsgToSend] = useState('');
   const [chatLog, setChatLog] = useState<{ sender: string, msg: string, time: string }[]>([]);
@@ -710,7 +710,7 @@ function App() {
                       <button
                         onClick={() => {
                           setFailedTransfers(prev => prev.filter((_, i) => i !== idx));
-                          setTransferQueue(prev => [...prev, path]);
+                          setTransferQueue(prev => [...prev, { absolutePath: path, relativePath: fileName }]);
                           addLog('System', `Retrying file: ${fileName}`);
                         }}
                         className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-red-500/20 shrink-0"
