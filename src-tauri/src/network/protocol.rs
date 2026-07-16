@@ -9,6 +9,7 @@ pub struct MetadataMessage {
     pub mime: String,
     pub checksum_sha256: String,
     pub chunk_size: u32,
+    pub relative_path: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -38,8 +39,15 @@ pub struct ProgressEvent {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct PairingRequest {
+    pub r#type: String, // "pairing_req"
+    pub device_name: String,
+    pub pin: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ControlMessage {
     pub r#type: String, // "control"
-    pub transfer_id: String,
-    pub action: String, // "accept" or "reject"
+    pub action: String, // "accept", "reject", "pause", "resume"
+    pub transfer_id: Option<String>,
 }

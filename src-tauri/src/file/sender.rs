@@ -9,7 +9,7 @@ use crate::file::checksum;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
-pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String) -> Result<(), String> {
+pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String, relative_path: Option<String>) -> Result<(), String> {
     let path = Path::new(&file_path);
     let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
     let metadata_info = std::fs::metadata(&path).map_err(|e| e.to_string())?;
@@ -27,6 +27,7 @@ pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String)
         mime: "application/octet-stream".to_string(),
         checksum_sha256: sha256,
         chunk_size,
+        relative_path,
     };
     
     let meta_json = serde_json::to_string(&meta_msg).map_err(|e| e.to_string())?;

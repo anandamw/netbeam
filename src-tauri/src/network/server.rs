@@ -63,6 +63,17 @@ pub async fn run_server(
 
                 if let Ok(meta) = serde_json::from_str::<MetadataMessage>(&first_line) {
                     if meta.r#type == "metadata" {
+                        let trusted = crate::store::get_trusted_devices();
+                        if !trusted.iter().any(|d| d.ip == peer_clone) {
+                            let control_msg = crate::network::protocol::ControlMessage {
+                                r#type: "control".to_string(),
+                                action: "reject".to_string(),
+                                transfer_id: Some(meta.transfer_id.clone()),
+                            };
+                            let _ = tx_clone.send(format!("{}\n", serde_json::to_string(&control_msg).unwrap())).await;
+                            let _ = app_clone.emit("network-message", (peer_clone.clone(), "Transfer blocked: Device not paired.".to_string()));
+                            return;
+                        }
                         
                         let (tx_oneshot, rx_oneshot) = tokio::sync::oneshot::channel();
                         {
@@ -92,7 +103,7 @@ pub async fn run_server(
                         
                         let control_msg = crate::network::protocol::ControlMessage {
                             r#type: "control".to_string(),
-                            transfer_id: meta.transfer_id.clone(),
+                            transfer_id: Some(meta.transfer_id.clone()),
                             action: if is_accepted { "accept".to_string() } else { "reject".to_string() },
                         };
                         
@@ -105,7 +116,16 @@ pub async fn run_server(
                         }
 
                         let download_dir = dirs::download_dir().unwrap_or_else(|| PathBuf::from("."));
-                        let save_path = download_dir.join(&meta.file_name);
+                        let rel_path = meta.relative_path.clone().unwrap_or(meta.file_name.clone());
+                        let safe_path: std::path::PathBuf = rel_path
+                            .split('/')
+                            .filter(|c| !c.is_empty() && *c != "." && *c != "..")
+                            .collect();
+                        let save_path = download_dir.join(safe_path);
+                        
+                        if let Some(parent) = save_path.parent() {
+                            let _ = std::fs::create_dir_all(parent);
+                        }
                         
                         match File::create(&save_path).await {
                             Ok(mut file) => {
@@ -202,6 +222,48 @@ pub async fn run_server(
                                 let _ = app_clone.emit("network-message", (peer_clone.clone(), format!("Failed to create file: {}", e)));
                             }
                         }
+                        return;
+                    }
+                } else if let Ok(pairing) = serde_json::from_str::<crate::network::protocol::PairingRequest>(&first_line) {
+                    if pairing.r#type == "pairing_req" {
+                        let (tx_oneshot, rx_oneshot) = tokio::sync::oneshot::channel();
+                        {
+                            let mut st = state_clone.lock().await;
+                            st.pending_transfers.insert(peer_clone.clone(), tx_oneshot);
+                        }
+                        
+                        #[derive(serde::Serialize, Clone)]
+                        struct PairingPayload {
+                            ip: String,
+                            device_name: String,
+                            pin: String,
+                        }
+                        
+                        let _ = app_clone.emit("pairing-request", PairingPayload {
+                            ip: peer_clone.clone(),
+                            device_name: pairing.device_name.clone(),
+                            pin: pairing.pin.clone(),
+                        });
+                        
+                        let is_accepted = match rx_oneshot.await {
+                            Ok(v) => v,
+                            Err(_) => false,
+                        };
+                        
+                        let control_msg = crate::network::protocol::ControlMessage {
+                            r#type: "control".to_string(),
+                            action: if is_accepted { "accept".to_string() } else { "reject".to_string() },
+                            transfer_id: None,
+                        };
+                        
+                        if is_accepted {
+                            crate::store::add_trusted_device(crate::store::TrustedDevice {
+                                ip: peer_clone.clone(),
+                                name: pairing.device_name.clone(),
+                            });
+                        }
+                        
+                        let _ = tx_clone.send(format!("{}\n", serde_json::to_string(&control_msg).unwrap())).await;
                         return;
                     }
                 }

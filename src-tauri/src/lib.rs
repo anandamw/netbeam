@@ -26,7 +26,10 @@ pub fn run() {
         commands::get_history,
         commands::add_history_record,
         commands::get_recent_devices,
-        commands::add_recent_device
+        commands::add_recent_device,
+        commands::expand_paths,
+        commands::get_trusted_devices,
+        commands::pair_device
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

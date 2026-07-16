@@ -70,3 +70,28 @@ pub fn add_recent_device(device: RecentDevice) {
     let path = get_data_dir().join("devices.json");
     let _ = fs::write(path, serde_json::to_string_pretty(&devices).unwrap_or_default());
 }
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TrustedDevice {
+    pub ip: String,
+    pub name: String,
+}
+
+pub fn get_trusted_devices() -> Vec<TrustedDevice> {
+    let path = get_data_dir().join("trusted_devices.json");
+    if let Ok(content) = fs::read_to_string(path) {
+        if let Ok(devices) = serde_json::from_str(&content) {
+            return devices;
+        }
+    }
+    Vec::new()
+}
+
+pub fn add_trusted_device(device: TrustedDevice) {
+    let mut devices = get_trusted_devices();
+    if !devices.iter().any(|d| d.ip == device.ip) {
+        devices.push(device);
+        let path = get_data_dir().join("trusted_devices.json");
+        let _ = fs::write(path, serde_json::to_string_pretty(&devices).unwrap_or_default());
+    }
+}

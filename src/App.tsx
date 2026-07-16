@@ -40,7 +40,7 @@ function App() {
   const [discoveredDevices, setDiscoveredDevices] = useState<Record<string, DeviceInfo>>({});
 
   // Phase 6: Transfer Queue & Drag Drop
-  const [transferQueue, setTransferQueue] = useState<string[]>([]);
+  const [transferQueue, setTransferQueue] = useState<{ absolutePath: string, relativePath: string }[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -51,17 +51,27 @@ function App() {
   // Phase 7: Transfer Confirmation
   const [transferRequests, setTransferRequests] = useState<{ transfer_id: string, file_name: string, file_size: number, sender: string }[]>([]);
 
-  // Phase 8: History and Recent Devices
   const [history, setHistory] = useState<any[]>([]);
   const [recentDevices, setRecentDevices] = useState<any[]>([]);
+  const [trustedDevices, setTrustedDevices] = useState<any[]>([]);
+
+  // Phase 7: Pairing
+  const [pairingRequest, setPairingRequest] = useState<{ ip: string, device_name: string, pin: string } | null>(null);
+  const [isPairingWait, setIsPairingWait] = useState<{ ip: string, pin: string } | null>(null);
+
+  // Phase 8: History Search & Filter
+  const [historySearch, setHistorySearch] = useState('');
+  const [historyFilter, setHistoryFilter] = useState('all');
 
   useEffect(() => {
     const loadStore = async () => {
       try {
         const hist = await invoke<any[]>('get_history');
         const devs = await invoke<any[]>('get_recent_devices');
+        const trusted = await invoke<any[]>('get_trusted_devices');
         setHistory(hist);
         setRecentDevices(devs);
+        setTrustedDevices(trusted);
       } catch (e) {
         console.error("Store error:", e);
       }
@@ -121,6 +131,10 @@ function App() {
       setTransferRequests(prev => [...prev, event.payload]);
     });
 
+    const unlistenPairingRequest = listen<{ ip: string, device_name: string, pin: string }>('pairing-request', (event) => {
+      setPairingRequest(event.payload);
+    });
+
     // Tauri window drag and drop listeners
     const unlistenDragEnter = listen('tauri://drag-enter', () => {
       setIsDragging(true);
@@ -130,7 +144,7 @@ function App() {
       setIsDragging(false);
     });
 
-    const unlistenDragDrop = listen<{ paths: string[] }>('tauri://drag-drop', (event) => {
+    const unlistenDragDrop = listen<{ paths: string[] }>('tauri://drag-drop', async (event) => {
       setIsDragging(false);
 
       let paths: string[] = [];
@@ -141,8 +155,15 @@ function App() {
       }
 
       if (paths.length > 0) {
-        setTransferQueue(prev => [...prev, ...paths]);
-        addLog('System', `Added ${paths.length} file(s) via Drag & Drop.`);
+        try {
+          const expanded = await invoke<{ absolute_path: string, relative_path: string }[]>('expand_paths', { paths });
+          const toQueue = expanded.map(e => ({ absolutePath: e.absolute_path, relativePath: e.relative_path }));
+          setTransferQueue(prev => [...prev, ...toQueue]);
+          addLog('System', `Added ${toQueue.length} file(s) via Drag & Drop.`);
+        } catch (e) {
+          console.error(e);
+          addLog('Error', `Drag & Drop expansion error: ${e}`);
+        }
       }
     });
 
@@ -152,6 +173,7 @@ function App() {
       unlistenProgress.then(f => f());
       unlistenDiscovery.then(f => f());
       unlistenTransferRequest.then(f => f());
+      unlistenPairingRequest.then(f => f());
       unlistenDragEnter.then(f => f());
       unlistenDragLeave.then(f => f());
       unlistenDragDrop.then(f => f());
@@ -167,16 +189,17 @@ function App() {
 
       const sendNext = async () => {
         try {
-          addLog('System', `Sending: ${nextFile.split('\\').pop() || nextFile.split('/').pop()}`);
+          addLog('System', `Sending: ${nextFile.relativePath}`);
           await invoke<string>('send_file', {
             ip: targetIp,
             port: Number(targetPort),
-            filePath: nextFile
+            filePath: nextFile.absolutePath,
+            relativePath: nextFile.relativePath
           });
         } catch (e) {
           console.error(e);
-          addLog('Error', `Send failed for ${nextFile.split('\\').pop() || nextFile.split('/').pop()}: ${e}`);
-          setFailedTransfers(prev => [...prev, nextFile]);
+          addLog('Error', `Send failed for ${nextFile.relativePath}: ${e}`);
+          setFailedTransfers(prev => [...prev, nextFile.absolutePath]);
           setIsTransferring(false); // Move to next on error
         }
       };
@@ -197,6 +220,44 @@ function App() {
       console.error(e);
       addLog('Error', `${e}`);
     }
+  };
+
+  const handlePair = async () => {
+    if (!targetIp) return;
+    const pin = Math.floor(100000 + Math.random() * 900000).toString();
+    setIsPairingWait({ ip: targetIp, pin });
+    try {
+      const res = await invoke<string>('pair_device', { ip: targetIp, port: Number(targetPort), deviceName: myDeviceName, pin });
+      addLog('System', res);
+      const trusted = await invoke<any[]>('get_trusted_devices');
+      setTrustedDevices(trusted);
+    } catch (e) {
+      addLog('Error', `Pairing failed: ${e}`);
+    } finally {
+      setIsPairingWait(null);
+    }
+  };
+
+  const acceptPairing = async () => {
+    if (!pairingRequest) return;
+    try {
+      await invoke('accept_transfer', { transferId: pairingRequest.ip });
+      const trusted = await invoke<any[]>('get_trusted_devices');
+      setTrustedDevices(trusted);
+    } catch (e) {
+      console.error(e);
+    }
+    setPairingRequest(null);
+  };
+
+  const rejectPairing = async () => {
+    if (!pairingRequest) return;
+    try {
+      await invoke('reject_transfer', { transferId: pairingRequest.ip });
+    } catch (e) {
+      console.error(e);
+    }
+    setPairingRequest(null);
   };
 
   const handleConnect = async () => {
@@ -236,17 +297,41 @@ function App() {
         multiple: true,
         title: 'Select file(s) to send'
       });
-      if (selected === null) {
-        return;
-      }
+      if (selected === null) return;
 
       const files = Array.isArray(selected) ? selected : [selected];
-      setTransferQueue(prev => [...prev, ...files]);
-      addLog('System', `Added ${files.length} file(s) to transfer queue.`);
+      const expanded = await invoke<{ absolute_path: string, relative_path: string }[]>('expand_paths', { paths: files });
+      
+      const toQueue = expanded.map(e => ({ absolutePath: e.absolute_path, relativePath: e.relative_path }));
+      setTransferQueue(prev => [...prev, ...toQueue]);
+      addLog('System', `Added ${toQueue.length} file(s) to transfer queue.`);
 
     } catch (e) {
       console.error(e);
       addLog('Error', `File picker error: ${e}`);
+    }
+  };
+
+  const handleSendFolder = async () => {
+    if (!targetIp) return;
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: true,
+        title: 'Select folder(s) to send'
+      });
+      if (selected === null) return;
+
+      const folders = Array.isArray(selected) ? selected : [selected];
+      const expanded = await invoke<{ absolute_path: string, relative_path: string }[]>('expand_paths', { paths: folders });
+      
+      const toQueue = expanded.map(e => ({ absolutePath: e.absolute_path, relativePath: e.relative_path }));
+      setTransferQueue(prev => [...prev, ...toQueue]);
+      addLog('System', `Added ${toQueue.length} file(s) from folder to transfer queue.`);
+
+    } catch (e) {
+      console.error(e);
+      addLog('Error', `Folder picker error: ${e}`);
     }
   };
 
@@ -255,6 +340,22 @@ function App() {
     setTargetPort(device.port);
     setTargetName(device.device_name);
   };
+
+  const filteredHistory = history.filter(record => {
+    if (historyFilter !== 'all') {
+      if (historyFilter === 'sent' && record.direction !== 'sent') return false;
+      if (historyFilter === 'received' && record.direction !== 'received' && record.direction !== 'completed') return false;
+      if (historyFilter === 'success' && record.status !== 'success') return false;
+      if (historyFilter === 'failed' && record.status !== 'failed') return false;
+    }
+    if (historySearch.trim() !== '') {
+      const term = historySearch.toLowerCase();
+      if (!record.file_name?.toLowerCase().includes(term) && !record.peer?.toLowerCase().includes(term)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen p-6 md:p-10 max-w-7xl mx-auto flex flex-col gap-8 relative z-10">
@@ -465,19 +566,36 @@ function App() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-4">
-              <button
-                onClick={handleConnect}
-                disabled={!targetIp}
-                className="flex-1 py-3 px-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 border border-white/5 flex justify-center items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4 text-gray-400" /> Ping / Connect
-              </button>
+              {!trustedDevices.some(d => d.ip === targetIp) && targetIp ? (
+                <button
+                  onClick={handlePair}
+                  disabled={!targetIp}
+                  className="flex-1 py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_30px_rgba(37,99,235,0.5)] flex justify-center items-center gap-2 transform active:scale-[0.98]"
+                >
+                  <CheckCircle2 className="w-5 h-5" /> Pair Device
+                </button>
+              ) : (
+                <button
+                  onClick={handleConnect}
+                  disabled={!targetIp}
+                  className="flex-1 py-3 px-4 bg-gray-800 hover:bg-gray-700 text-white rounded-xl font-semibold transition-all disabled:opacity-50 border border-white/5 flex justify-center items-center gap-2"
+                >
+                  <CheckCircle2 className="w-4 h-4 text-gray-400" /> Ping / Connect
+                </button>
+              )}
               <button
                 onClick={handleSendFile}
-                disabled={!targetIp}
-                className="flex-[2] py-3 px-4 bg-gradient-to-r from-primary to-primary-hover text-[#121212] rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:shadow-[0_0_30px_rgba(250,204,21,0.5)] disabled:opacity-50 disabled:shadow-none flex justify-center items-center gap-2 transform active:scale-[0.98]"
+                disabled={!targetIp || !trustedDevices.some(d => d.ip === targetIp)}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-primary to-primary-hover text-[#121212] rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(250,204,21,0.3)] hover:shadow-[0_0_30px_rgba(250,204,21,0.5)] disabled:opacity-50 disabled:shadow-none flex justify-center items-center gap-2 transform active:scale-[0.98]"
               >
-                <FileIcon className="w-5 h-5" /> Select & Send File
+                <FileIcon className="w-5 h-5" /> File(s)
+              </button>
+              <button
+                onClick={handleSendFolder}
+                disabled={!targetIp || !trustedDevices.some(d => d.ip === targetIp)}
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-green-400 to-green-500 text-[#121212] rounded-xl font-bold transition-all shadow-[0_0_20px_rgba(74,222,128,0.3)] hover:shadow-[0_0_30px_rgba(74,222,128,0.5)] disabled:opacity-50 disabled:shadow-none flex justify-center items-center gap-2 transform active:scale-[0.98]"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg> Folder
               </button>
             </div>
 
@@ -648,13 +766,33 @@ function App() {
           {/* Transfer History */}
           {history.length > 0 && (
             <div className="glass rounded-2xl flex-1 flex flex-col min-h-[250px] max-h-[400px] overflow-hidden">
-              <div className="p-4 border-b border-white/5 bg-black/20">
+              <div className="p-4 border-b border-white/5 bg-black/20 flex flex-col gap-3">
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                   <FileIcon className="w-5 h-5 text-primary" /> Transfer History
                 </h2>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Search file or IP..." 
+                    value={historySearch}
+                    onChange={e => setHistorySearch(e.target.value)}
+                    className="flex-1 px-3 py-1.5 bg-black/40 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary/50"
+                  />
+                  <select 
+                    value={historyFilter}
+                    onChange={e => setHistoryFilter(e.target.value)}
+                    className="bg-black/40 border border-white/10 rounded-lg text-sm text-gray-300 px-2 py-1.5 focus:outline-none focus:border-primary/50 [&>option]:bg-gray-900"
+                  >
+                    <option value="all">All</option>
+                    <option value="sent">Sent</option>
+                    <option value="received">Received</option>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
               </div>
               <div className="flex-1 p-4 overflow-y-auto space-y-2 bg-black/10">
-                {history.map((record, i) => (
+                {filteredHistory.map((record, i) => (
                   <div key={i} className="bg-black/30 p-3 rounded-xl border border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors">
                     <div className="flex items-center gap-3 overflow-hidden">
                       <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${record.status === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
@@ -673,12 +811,63 @@ function App() {
                     </div>
                   </div>
                 ))}
+                {filteredHistory.length === 0 && (
+                  <div className="text-center text-gray-500 text-sm py-4">No records found.</div>
+                )}
               </div>
             </div>
           )}
 
         </div>
       </div>
+
+      {/* Sender Pairing Modal */}
+      {isPairingWait && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 max-w-sm w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-blue-500 animate-pulse"></div>
+            <h3 className="text-xl font-bold text-white mb-2">Pairing Request</h3>
+            <p className="text-gray-400 mb-6 text-sm">Menunggu target ({isPairingWait.ip}) untuk menyetujui...</p>
+            <div className="bg-black/50 border border-white/5 rounded-xl p-6 text-center">
+              <span className="block text-xs text-gray-500 uppercase tracking-widest font-bold mb-2">Kode PIN</span>
+              <span className="text-4xl font-black tracking-widest text-blue-400">{isPairingWait.pin}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receiver Pairing Modal */}
+      {pairingRequest && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-white/10 rounded-2xl p-8 max-w-sm w-full shadow-2xl relative overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-yellow-500 animate-pulse"></div>
+            <h3 className="text-xl font-bold text-white mb-2">Incoming Pairing</h3>
+            <p className="text-gray-400 mb-6 text-sm">Perangkat <strong className="text-white">{pairingRequest.device_name}</strong> ({pairingRequest.ip}) ingin terhubung.</p>
+            
+            <div className="bg-black/50 border border-white/5 rounded-xl p-6 text-center mb-6">
+              <span className="block text-xs text-gray-500 uppercase tracking-widest font-bold mb-2">Verifikasi PIN</span>
+              <span className="text-4xl font-black tracking-widest text-yellow-400">{pairingRequest.pin}</span>
+              <span className="block text-xs text-gray-500 mt-3">Pastikan PIN ini sama dengan layar pengirim!</span>
+            </div>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={rejectPairing}
+                className="flex-1 py-3 px-4 rounded-xl font-semibold bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors border border-red-500/20"
+              >
+                Tolak
+              </button>
+              <button 
+                onClick={acceptPairing}
+                className="flex-1 py-3 px-4 rounded-xl font-bold bg-gradient-to-r from-yellow-400 to-yellow-500 text-black hover:opacity-90 transition-opacity shadow-[0_0_15px_rgba(250,204,21,0.3)]"
+              >
+                Terima
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

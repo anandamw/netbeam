@@ -71,7 +71,7 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 *Objective: Fitur tambahan untuk meningkatkan pengalaman pengguna.*
 
 - [x] Multiple File Transfer
-- [ ] Folder Transfer
+- [x] Folder Transfer
 - [x] Drag & Drop
 - [x] Pause & Resume
 - [x] Retry
@@ -80,20 +80,20 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 ## Phase 7 - Security
 *Objective: Mengamankan koneksi dan transfer file.*
 
-- [ ] Pairing Device (PIN/QR code confirmation)
+- [x] Pairing Device (PIN/QR code confirmation)
 - [ ] Key exchange (X25519) saat pairing
 - [x] Confirmation Dialog
 - [ ] AES-256-GCM Encryption pada seluruh channel setelah pairing
 - [x] SHA256 Verification (per-file dan per-chunk)
-- [ ] Trusted device list
+- [x] Trusted device list
 
 ## Phase 8 - History
 *Objective: Pencatatan riwayat transfer lokal.*
 
 - [x] Transfer History (disimpan lokal)
 - [x] Recent Device
-- [ ] Search
-- [ ] Filter
+- [x] Search
+- [x] Filter
 
 ## Phase 9 - Packaging & Release
 *Objective: Distribusi aplikasi.*
