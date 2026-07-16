@@ -5,10 +5,10 @@
   
   **Lightning Fast Local P2P File Transfer**
   <p>
-    <a href="https://github.com/USERNAME/netbeam/releases/latest">
+    <a href="https://github.com/anandamw/netbeam/releases/latest">
       <img src="https://img.shields.io/badge/Download_for_Windows-(.exe)-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Download Windows" />
     </a>
-    <a href="https://github.com/USERNAME/netbeam/releases/latest">
+    <a href="https://github.com/anandamw/netbeam/releases/latest">
       <img src="https://img.shields.io/badge/Download_for_Android-(.apk)-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Download Android" />
     </a>
   </p>
