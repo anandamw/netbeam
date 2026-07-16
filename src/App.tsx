@@ -38,15 +38,36 @@ function App() {
 
   const [progresses, setProgresses] = useState<Record<string, ProgressEvent>>({});
   const [discoveredDevices, setDiscoveredDevices] = useState<Record<string, DeviceInfo>>({});
-  
+
   // Phase 6: Transfer Queue & Drag Drop
   const [transferQueue, setTransferQueue] = useState<string[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  
+
   // Phase 6: Pause, Resume, Retry
   const [isQueuePaused, setIsQueuePaused] = useState(false);
   const [failedTransfers, setFailedTransfers] = useState<string[]>([]);
+
+  // Phase 7: Transfer Confirmation
+  const [transferRequests, setTransferRequests] = useState<{ transfer_id: string, file_name: string, file_size: number, sender: string }[]>([]);
+
+  // Phase 8: History and Recent Devices
+  const [history, setHistory] = useState<any[]>([]);
+  const [recentDevices, setRecentDevices] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadStore = async () => {
+      try {
+        const hist = await invoke<any[]>('get_history');
+        const devs = await invoke<any[]>('get_recent_devices');
+        setHistory(hist);
+        setRecentDevices(devs);
+      } catch (e) {
+        console.error("Store error:", e);
+      }
+    };
+    loadStore();
+  }, []);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -76,6 +97,16 @@ function App() {
       setProgresses(prev => ({ ...prev, [event.payload.transfer_id]: event.payload }));
       if (event.payload.is_done) {
         setIsTransferring(false);
+        const record = {
+          file_name: event.payload.file_name,
+          file_size: event.payload.total_bytes,
+          timestamp: new Date().toISOString(),
+          peer: 'Remote',
+          direction: 'completed',
+          status: 'success'
+        };
+        invoke('add_history_record', { record }).catch(console.error);
+        setHistory(prev => [record, ...prev].slice(0, 100));
       }
     });
 
@@ -84,6 +115,10 @@ function App() {
         ...prev,
         [`${event.payload.ip}:${event.payload.port}`]: event.payload
       }));
+    });
+
+    const unlistenTransferRequest = listen<{ transfer_id: string, file_name: string, file_size: number, sender: string }>('transfer-request', (event) => {
+      setTransferRequests(prev => [...prev, event.payload]);
     });
 
     // Tauri window drag and drop listeners
@@ -97,14 +132,14 @@ function App() {
 
     const unlistenDragDrop = listen<{ paths: string[] }>('tauri://drag-drop', (event) => {
       setIsDragging(false);
-      
+
       let paths: string[] = [];
       if (event.payload && Array.isArray(event.payload.paths)) {
         paths = event.payload.paths;
       } else if (Array.isArray(event.payload)) {
         paths = event.payload as unknown as string[];
       }
-      
+
       if (paths.length > 0) {
         setTransferQueue(prev => [...prev, ...paths]);
         addLog('System', `Added ${paths.length} file(s) via Drag & Drop.`);
@@ -116,6 +151,7 @@ function App() {
       unlistenMessage.then(f => f());
       unlistenProgress.then(f => f());
       unlistenDiscovery.then(f => f());
+      unlistenTransferRequest.then(f => f());
       unlistenDragEnter.then(f => f());
       unlistenDragLeave.then(f => f());
       unlistenDragDrop.then(f => f());
@@ -128,7 +164,7 @@ function App() {
       const nextFile = transferQueue[0];
       setTransferQueue(prev => prev.slice(1));
       setIsTransferring(true);
-      
+
       const sendNext = async () => {
         try {
           addLog('System', `Sending: ${nextFile.split('\\').pop() || nextFile.split('/').pop()}`);
@@ -144,7 +180,7 @@ function App() {
           setIsTransferring(false); // Move to next on error
         }
       };
-      
+
       sendNext();
     }
   }, [isTransferring, transferQueue, targetIp, targetPort, isQueuePaused]);
@@ -167,6 +203,14 @@ function App() {
     try {
       const res = await invoke<string>('connect_client', { ip: targetIp, port: Number(targetPort) });
       addLog('System', res);
+
+      const newDev = { ip: targetIp, port: Number(targetPort), last_seen: new Date().toISOString() };
+      invoke('add_recent_device', { device: newDev }).catch(console.error);
+      setRecentDevices(prev => {
+        const list = prev.filter(d => d.ip !== targetIp);
+        return [newDev, ...list].slice(0, 20);
+      });
+
     } catch (e) {
       console.error(e);
       addLog('Error', `${e}`);
@@ -199,7 +243,7 @@ function App() {
       const files = Array.isArray(selected) ? selected : [selected];
       setTransferQueue(prev => [...prev, ...files]);
       addLog('System', `Added ${files.length} file(s) to transfer queue.`);
-      
+
     } catch (e) {
       console.error(e);
       addLog('Error', `File picker error: ${e}`);
@@ -214,7 +258,7 @@ function App() {
 
   return (
     <div className="min-h-screen p-6 md:p-10 max-w-7xl mx-auto flex flex-col gap-8 relative z-10">
-      
+
       {/* Drag & Drop Overlay */}
       {isDragging && (
         <div className="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm border-[6px] border-dashed border-primary flex items-center justify-center pointer-events-none transition-all duration-300">
@@ -224,6 +268,55 @@ function App() {
             </div>
             <h2 className="text-3xl font-bold text-white">Drop File(s) Here</h2>
             <p className="text-gray-400">Release to add to the transfer queue</p>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Request Overlay */}
+      {transferRequests.length > 0 && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-primary/30 rounded-2xl p-6 shadow-2xl max-w-sm w-full animate-in fade-in zoom-in duration-200">
+            <div className="flex justify-center mb-4 text-primary animate-pulse">
+              <AlertCircle className="w-12 h-12" />
+            </div>
+            <h3 className="text-xl font-bold text-white text-center mb-2">Incoming File</h3>
+            <p className="text-gray-300 text-center mb-6">
+              <strong className="text-white">{transferRequests[0].sender}</strong> wants to send you <br />
+              <span className="text-primary font-medium break-all">{transferRequests[0].file_name}</span> <br />
+              <span className="text-sm text-gray-400">({(transferRequests[0].file_size / 1048576).toFixed(2)} MB)</span>
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={async () => {
+                  const req = transferRequests[0];
+                  try {
+                    await invoke('reject_transfer', { transferId: req.transfer_id });
+                    addLog('System', `Rejected transfer of ${req.file_name}`);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                  setTransferRequests(prev => prev.slice(1));
+                }}
+                className="flex-1 bg-red-500/10 hover:bg-red-500/20 text-red-500 font-semibold py-2.5 rounded-xl transition-colors border border-red-500/20"
+              >
+                Reject
+              </button>
+              <button
+                onClick={async () => {
+                  const req = transferRequests[0];
+                  try {
+                    await invoke('accept_transfer', { transferId: req.transfer_id });
+                    addLog('System', `Accepted transfer of ${req.file_name}`);
+                  } catch (e) {
+                    console.error(e);
+                  }
+                  setTransferRequests(prev => prev.slice(1));
+                }}
+                className="flex-1 bg-primary text-black font-bold py-2.5 rounded-xl hover:bg-primary-hover transition-colors shadow-lg shadow-primary/20"
+              >
+                Accept
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -324,8 +417,8 @@ function App() {
                   key={i}
                   onClick={() => selectDevice(device)}
                   className={`w-full text-left p-4 rounded-xl border transition-all duration-300 flex items-center gap-4 ${targetIp === device.ip && targetPort === device.port
-                      ? 'bg-primary/20 border-primary/50 shadow-[0_0_15px_rgba(250,204,21,0.2)]'
-                      : 'bg-black/30 border-white/5 hover:bg-black/50 hover:border-white/10'
+                    ? 'bg-primary/20 border-primary/50 shadow-[0_0_15px_rgba(250,204,21,0.2)]'
+                    : 'bg-black/30 border-white/5 hover:bg-black/50 hover:border-white/10'
                     }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gray-800 to-gray-900 border border-white/10 flex items-center justify-center shrink-0">
@@ -387,6 +480,21 @@ function App() {
                 <FileIcon className="w-5 h-5" /> Select & Send File
               </button>
             </div>
+            
+            {recentDevices.length > 0 && (
+              <div className="mt-6 pt-5 border-t border-white/5 flex flex-wrap gap-2 items-center">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Recent:</span>
+                {recentDevices.map(dev => (
+                  <button
+                    key={dev.ip}
+                    onClick={() => { setTargetIp(dev.ip); setTargetPort(dev.port.toString()); }}
+                    className="bg-black/30 hover:bg-primary/20 text-gray-300 hover:text-primary px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border border-white/10 hover:border-primary/50"
+                  >
+                    {dev.ip}:{dev.port}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Transfers in Progress */}
@@ -396,9 +504,9 @@ function App() {
                 <h2 className="text-lg font-semibold text-white">Active Transfers</h2>
                 <div className="flex items-center gap-2">
                   {transferQueue.length > 0 && (
-                     <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${isQueuePaused ? 'bg-orange-500/20 text-orange-400' : 'bg-primary/20 text-primary animate-pulse'}`}>
-                       {transferQueue.length} file(s) in queue
-                     </span>
+                    <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${isQueuePaused ? 'bg-orange-500/20 text-orange-400' : 'bg-primary/20 text-primary animate-pulse'}`}>
+                      {transferQueue.length} file(s) in queue
+                    </span>
                   )}
                   {transferQueue.length > 0 && (
                     <button
@@ -447,32 +555,32 @@ function App() {
                     </div>
                   </div>
                 ))}
-                
+
                 {failedTransfers.length > 0 && failedTransfers.map((path, idx) => {
-                   const fileName = path.split('\\').pop() || path.split('/').pop();
-                   return (
-                     <div key={`failed-${idx}`} className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 relative overflow-hidden flex justify-between items-center">
-                       <div className="flex items-center gap-3 overflow-hidden">
-                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-red-500/20 text-red-400">
-                           <AlertCircle className="w-4 h-4" />
-                         </div>
-                         <div>
-                           <span className="font-medium text-gray-200 block truncate">{fileName}</span>
-                           <span className="text-xs text-red-400">Transfer failed</span>
-                         </div>
-                       </div>
-                       <button
-                         onClick={() => {
-                           setFailedTransfers(prev => prev.filter((_, i) => i !== idx));
-                           setTransferQueue(prev => [...prev, path]);
-                           addLog('System', `Retrying file: ${fileName}`);
-                         }}
-                         className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-red-500/20 shrink-0"
-                       >
-                         <Play className="w-3 h-3" /> Retry
-                       </button>
-                     </div>
-                   );
+                  const fileName = path.split('\\').pop() || path.split('/').pop();
+                  return (
+                    <div key={`failed-${idx}`} className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 relative overflow-hidden flex justify-between items-center">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-red-500/20 text-red-400">
+                          <AlertCircle className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <span className="font-medium text-gray-200 block truncate">{fileName}</span>
+                          <span className="text-xs text-red-400">Transfer failed</span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setFailedTransfers(prev => prev.filter((_, i) => i !== idx));
+                          setTransferQueue(prev => [...prev, path]);
+                          addLog('System', `Retrying file: ${fileName}`);
+                        }}
+                        className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-red-500/20 shrink-0"
+                      >
+                        <Play className="w-3 h-3" /> Retry
+                      </button>
+                    </div>
+                  );
                 })}
               </div>
             </div>
@@ -505,9 +613,9 @@ function App() {
                         <span>{log.time}</span>
                       </div>
                       <div className={`px-4 py-2.5 rounded-2xl text-sm ${log.sender === 'Error' ? 'bg-red-500/10 text-red-400 border border-red-500/20 rounded-tl-sm' :
-                          log.sender === 'System' ? 'bg-gray-800/50 text-gray-300 border border-white/5 rounded-tl-sm' :
-                            isMe ? 'bg-primary text-[#121212] rounded-tr-sm font-medium' :
-                              'bg-gray-800 text-gray-100 rounded-tl-sm'
+                        log.sender === 'System' ? 'bg-gray-800/50 text-gray-300 border border-white/5 rounded-tl-sm' :
+                          isMe ? 'bg-primary text-[#121212] rounded-tr-sm font-medium' :
+                            'bg-gray-800 text-gray-100 rounded-tl-sm'
                         }`}>
                         {log.msg}
                       </div>

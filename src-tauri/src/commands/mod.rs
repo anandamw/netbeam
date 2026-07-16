@@ -74,3 +74,47 @@ pub async fn start_discovery(
     });
     Ok("Discovery started".into())
 }
+
+#[command]
+pub async fn accept_transfer(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    transfer_id: String,
+) -> Result<(), String> {
+    let mut st = state.lock().await;
+    if let Some(tx) = st.pending_transfers.remove(&transfer_id) {
+        let _ = tx.send(true);
+    }
+    Ok(())
+}
+
+#[command]
+pub async fn reject_transfer(
+    state: State<'_, Arc<Mutex<AppState>>>,
+    transfer_id: String,
+) -> Result<(), String> {
+    let mut st = state.lock().await;
+    if let Some(tx) = st.pending_transfers.remove(&transfer_id) {
+        let _ = tx.send(false);
+    }
+    Ok(())
+}
+
+#[command]
+pub fn get_history() -> Vec<crate::store::TransferRecord> {
+    crate::store::get_history()
+}
+
+#[command]
+pub fn add_history_record(record: crate::store::TransferRecord) {
+    crate::store::add_history_record(record);
+}
+
+#[command]
+pub fn get_recent_devices() -> Vec<crate::store::RecentDevice> {
+    crate::store::get_recent_devices()
+}
+
+#[command]
+pub fn add_recent_device(device: crate::store::RecentDevice) {
+    crate::store::add_recent_device(device);
+}

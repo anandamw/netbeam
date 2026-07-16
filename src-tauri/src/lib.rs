@@ -2,6 +2,7 @@ pub mod state;
 pub mod network;
 pub mod file;
 pub mod commands;
+pub mod store;
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -19,7 +20,13 @@ pub fn run() {
         commands::connect_client,
         commands::send_message,
         commands::send_file,
-        commands::start_discovery
+        commands::start_discovery,
+        commands::accept_transfer,
+        commands::reject_transfer,
+        commands::get_history,
+        commands::add_history_record,
+        commands::get_recent_devices,
+        commands::add_recent_device
     ])
     .setup(|app| {
       if cfg!(debug_assertions) {

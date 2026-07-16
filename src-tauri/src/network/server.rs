@@ -52,6 +52,7 @@ pub async fn run_server(
         let peer_clone = peer_addr.clone();
         
         let tx_clone = tx.clone(); // Clone channel to send messages from read loop
+        let state_clone = state.clone();
 
         tokio::spawn(async move {
             let mut reader = BufReader::new(rx_socket);
@@ -62,6 +63,47 @@ pub async fn run_server(
 
                 if let Ok(meta) = serde_json::from_str::<MetadataMessage>(&first_line) {
                     if meta.r#type == "metadata" {
+                        
+                        let (tx_oneshot, rx_oneshot) = tokio::sync::oneshot::channel();
+                        {
+                            let mut st = state_clone.lock().await;
+                            st.pending_transfers.insert(meta.transfer_id.clone(), tx_oneshot);
+                        }
+                        
+                        #[derive(serde::Serialize, Clone)]
+                        struct TransferRequestPayload {
+                            transfer_id: String,
+                            file_name: String,
+                            file_size: u64,
+                            sender: String,
+                        }
+                        
+                        let _ = app_clone.emit("transfer-request", TransferRequestPayload {
+                            transfer_id: meta.transfer_id.clone(),
+                            file_name: meta.file_name.clone(),
+                            file_size: meta.file_size,
+                            sender: peer_clone.clone(),
+                        });
+                        
+                        let is_accepted = match rx_oneshot.await {
+                            Ok(v) => v,
+                            Err(_) => false,
+                        };
+                        
+                        let control_msg = crate::network::protocol::ControlMessage {
+                            r#type: "control".to_string(),
+                            transfer_id: meta.transfer_id.clone(),
+                            action: if is_accepted { "accept".to_string() } else { "reject".to_string() },
+                        };
+                        
+                        let control_json = serde_json::to_string(&control_msg).unwrap();
+                        let _ = tx_clone.send(format!("{}\n", control_json)).await;
+                        
+                        if !is_accepted {
+                            let _ = app_clone.emit("network-message", (peer_clone.clone(), format!("Transfer rejected: {}", meta.file_name)));
+                            return;
+                        }
+
                         let download_dir = dirs::download_dir().unwrap_or_else(|| PathBuf::from("."));
                         let save_path = download_dir.join(&meta.file_name);
                         

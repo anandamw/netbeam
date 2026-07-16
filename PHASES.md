@@ -82,9 +82,9 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 
 - [ ] Pairing Device (PIN/QR code confirmation)
 - [ ] Key exchange (X25519) saat pairing
-- [ ] Confirmation Dialog
+- [x] Confirmation Dialog
 - [ ] AES-256-GCM Encryption pada seluruh channel setelah pairing
-- [ ] SHA256 Verification (per-file dan per-chunk)
+- [x] SHA256 Verification (per-file dan per-chunk)
 - [ ] Trusted device list
 
 ## Phase 8 - History

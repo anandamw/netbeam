@@ -36,3 +36,10 @@ pub struct ProgressEvent {
     pub speed_mbps: f64, // MB/s
     pub is_done: bool,
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ControlMessage {
+    pub r#type: String, // "control"
+    pub transfer_id: String,
+    pub action: String, // "accept" or "reject"
+}

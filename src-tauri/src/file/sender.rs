@@ -41,6 +41,26 @@ pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String)
     let payload = format!("{}\n", meta_json);
     tx_socket.write_all(payload.as_bytes()).await.map_err(|e| e.to_string())?;
     
+    let mut reader = BufReader::new(rx_socket);
+    
+    // Wait for Confirmation
+    let mut control_line = String::new();
+    match reader.read_line(&mut control_line).await {
+        Ok(0) => return Err("Connection closed before confirmation".into()),
+        Ok(_) => {
+            if let Ok(ctrl) = serde_json::from_str::<crate::network::protocol::ControlMessage>(&control_line) {
+                if ctrl.action == "reject" {
+                    return Err("Transfer rejected by receiver".into());
+                } else if ctrl.action != "accept" {
+                    return Err("Invalid control response".into());
+                }
+            } else {
+                return Err(format!("Failed to parse ControlMessage: {}", control_line));
+            }
+        }
+        Err(e) => return Err(e.to_string()),
+    }
+    
     let mut file = File::open(&path).map_err(|e| e.to_string())?;
     let mut buffer = vec![0; chunk_size as usize];
     
@@ -48,8 +68,6 @@ pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String)
     let mut sent_bytes = 0u64;
     let start_time = Instant::now();
     let mut last_progress_time = Instant::now();
-    
-    let mut reader = BufReader::new(rx_socket);
 
     loop {
         let count = file.read(&mut buffer).map_err(|e| e.to_string())?;
