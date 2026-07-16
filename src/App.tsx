@@ -327,7 +327,7 @@ function App() {
             <Zap className="text-[#121212] w-6 h-6" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold tracking-tight text-white" style={{ textShadow: '0 0 20px rgba(250, 204, 21, 0.4)' }}>LAN Share</h1>
+            <h1 className="text-3xl font-bold tracking-tight text-white" style={{ textShadow: '0 0 20px rgba(250, 204, 21, 0.4)' }}>Netbeam</h1>
             <p className="text-gray-400 text-sm font-medium">Lightning Fast Local Transfer</p>
           </div>
         </div>

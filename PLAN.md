@@ -1,4 +1,4 @@
-# 📁 LAN Share Desktop App
+# 📁 Netbeam Desktop App
 > Aplikasi desktop / netbeam untuk berbagi file antar perangkat melalui jaringan LAN/Wi-Fi menggunakan TCP Socket.
 
 ---
@@ -7,7 +7,7 @@
 
 ## Deskripsi
 
-LAN Share adalah aplikasi desktop yang memungkinkan pengguna mengirim file secara langsung antar perangkat yang berada dalam jaringan lokal (LAN/Wi-Fi) tanpa memerlukan koneksi internet.
+Netbeam adalah aplikasi desktop yang memungkinkan pengguna mengirim file secara langsung antar perangkat yang berada dalam jaringan lokal (LAN/Wi-Fi) tanpa memerlukan koneksi internet.
 
 Inspirasi aplikasi:
 

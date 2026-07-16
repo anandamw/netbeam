@@ -1,7 +1,7 @@
 [package]
-name = "lan_share"
+name = "netbeam"
 version = "1.0.0"
-description = "LAN Share Application"
+description = "Netbeam Application"
 authors = ["Ananda"]
 license = "MIT"
 repository = ""

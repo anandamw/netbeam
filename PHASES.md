@@ -1,6 +1,6 @@
-# 🚀 LAN Share Development Phases
+# 🚀 Netbeam Development Phases
 
-Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan aplikasi LAN Share. Kita dapat memantau progres dengan memberikan tanda centang pada setiap tugas yang telah selesai.
+Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan aplikasi Netbeam. Kita dapat memantau progres dengan memberikan tanda centang pada setiap tugas yang telah selesai.
 
 ---
 

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "LAN Share",
+  "productName": "Netbeam",
   "version": "1.0.0",
-  "identifier": "com.anandamw.lanshare",
+  "identifier": "com.anandamw.netbeam",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "LAN Share",
+        "title": "Netbeam",
         "width": 1100,
         "height": 800,
         "resizable": true,
