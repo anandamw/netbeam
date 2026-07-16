@@ -99,7 +99,7 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 *Objective: Distribusi aplikasi.*
 
 - [x] Tauri bundler config
-- [ ] Code signing (opsional)
-- [ ] Auto-update via Tauri updater
-- [ ] Cross-platform compilation (Windows, macOS, Linux, Android)
-- [ ] Versioning & changelog (semver)
+- [x] Code signing (opsional)
+- [x] Auto-update via Tauri updater
+- [x] Cross-platform compilation (Windows, macOS, Linux, Android)
+- [x] Versioning & changelog (semver)
