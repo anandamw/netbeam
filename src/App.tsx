@@ -63,6 +63,9 @@ function App() {
   const [historySearch, setHistorySearch] = useState('');
   const [historyFilter, setHistoryFilter] = useState('all');
 
+  // Mobile UX
+  const [mobileTab, setMobileTab] = useState<'radar' | 'transfer' | 'history'>('radar');
+
   useEffect(() => {
     const loadStore = async () => {
       try {
@@ -434,10 +437,10 @@ function App() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 pb-24 lg:pb-0">
 
         {/* Left Sidebar */}
-        <div className="lg:col-span-4 flex flex-col gap-6">
+        <div className={`lg:col-span-4 flex-col gap-6 lg:flex ${mobileTab === 'radar' ? 'flex' : 'hidden'}`}>
 
           {/* Identity & Server */}
           <div className="glass rounded-2xl p-6 relative overflow-hidden group">
@@ -539,7 +542,7 @@ function App() {
         <div className="lg:col-span-8 flex flex-col gap-6">
 
           {/* Target & Actions */}
-          <div className="glass rounded-2xl p-6">
+          <div className={`glass rounded-2xl p-6 lg:block ${mobileTab === 'radar' ? 'block' : 'hidden'}`}>
             <h2 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
               <Send className="w-5 h-5 text-primary" /> Transfer Target
             </h2>
@@ -617,7 +620,7 @@ function App() {
 
           {/* Transfers in Progress */}
           {(Object.values(progresses).length > 0 || transferQueue.length > 0 || failedTransfers.length > 0) && (
-            <div className="glass rounded-2xl p-6">
+            <div className={`glass rounded-2xl p-6 lg:block ${mobileTab === 'transfer' ? 'block' : 'hidden'}`}>
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-white">Active Transfers</h2>
                 <div className="flex items-center gap-2">
@@ -704,8 +707,8 @@ function App() {
             </div>
           )}
 
-          {/* Chat & Logs */}
-          <div className="glass rounded-2xl flex-1 flex flex-col min-h-[300px] overflow-hidden">
+          {/* Chat Box */}
+          <div className={`glass rounded-2xl p-0 flex flex-col flex-1 min-h-[300px] lg:flex ${mobileTab === 'transfer' ? 'flex' : 'hidden'} overflow-hidden`}>
             <div className="p-4 border-b border-white/5 bg-black/20">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-gray-400" /> Event Log & Chat
@@ -764,8 +767,7 @@ function App() {
           </div>
 
           {/* Transfer History */}
-          {history.length > 0 && (
-            <div className="glass rounded-2xl flex-1 flex flex-col min-h-[250px] max-h-[400px] overflow-hidden">
+          <div className={`glass rounded-2xl flex-col min-h-[250px] max-h-[400px] overflow-hidden lg:flex ${mobileTab === 'history' ? 'flex' : 'hidden'}`}>
               <div className="p-4 border-b border-white/5 bg-black/20 flex flex-col gap-3">
                 <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                   <FileIcon className="w-5 h-5 text-primary" /> Transfer History
@@ -816,10 +818,34 @@ function App() {
                 )}
               </div>
             </div>
-          )}
 
         </div>
       </div>
+
+      {/* Bottom Navigation for Mobile */}
+      <nav className="fixed bottom-0 left-0 right-0 glass-dark border-t border-white/10 lg:hidden flex justify-around p-2 pb-safe z-40 bg-black/80 backdrop-blur-md">
+        <button 
+          onClick={() => setMobileTab('radar')} 
+          className={`flex flex-col items-center p-2 rounded-xl transition-all ${mobileTab === 'radar' ? 'text-primary scale-110' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <Wifi className="w-6 h-6 mb-1" />
+          <span className="text-[10px] font-bold tracking-wider uppercase">Radar</span>
+        </button>
+        <button 
+          onClick={() => setMobileTab('transfer')} 
+          className={`flex flex-col items-center p-2 rounded-xl transition-all ${mobileTab === 'transfer' ? 'text-primary scale-110' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <Send className="w-6 h-6 mb-1" />
+          <span className="text-[10px] font-bold tracking-wider uppercase">Transfer</span>
+        </button>
+        <button 
+          onClick={() => setMobileTab('history')} 
+          className={`flex flex-col items-center p-2 rounded-xl transition-all ${mobileTab === 'history' ? 'text-primary scale-110' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <FileIcon className="w-6 h-6 mb-1" />
+          <span className="text-[10px] font-bold tracking-wider uppercase">History</span>
+        </button>
+      </nav>
 
       {/* Sender Pairing Modal */}
       {isPairingWait && (
