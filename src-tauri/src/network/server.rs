@@ -14,6 +14,7 @@ pub async fn run_server(
     app_handle: AppHandle,
     state: Arc<Mutex<AppState>>,
     start_port: u16,
+    mut rx_abort: tokio::sync::oneshot::Receiver<()>,
 ) -> Result<(), String> {
     let mut port = start_port;
     let listener = loop {
@@ -36,7 +37,17 @@ pub async fn run_server(
     app_handle.emit("server-started", port).map_err(|e| e.to_string())?;
 
     loop {
-        let (stream, addr) = listener.accept().await.map_err(|e| e.to_string())?;
+        let accept_result = tokio::select! {
+            res = listener.accept() => res,
+            _ = &mut rx_abort => {
+                let mut st = state.lock().await;
+                st.server_port = None;
+                st.server_abort = None;
+                return Ok(());
+            }
+        };
+        
+        let (stream, addr) = accept_result.map_err(|e| e.to_string())?;
         let app = app_handle.clone();
         let peer_addr = addr.ip().to_string();
         

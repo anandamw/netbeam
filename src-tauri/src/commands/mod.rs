@@ -11,13 +11,37 @@ pub async fn start_server(
     state: State<'_, Arc<Mutex<AppState>>>,
     port: u16,
 ) -> Result<String, String> {
+    let (tx_abort, rx_abort) = tokio::sync::oneshot::channel();
+    
+    {
+        let mut st = state.inner().lock().await;
+        if st.server_port.is_some() {
+            return Err("Server is already running".to_string());
+        }
+        st.server_abort = Some(tx_abort);
+    }
+    
     let state_arc = state.inner().clone();
     
     tokio::spawn(async move {
-        let _ = network::server::run_server(app, state_arc, port).await;
+        let _ = network::server::run_server(app, state_arc, port, rx_abort).await;
     });
     
     Ok("Server starting...".to_string())
+}
+
+#[command]
+pub async fn stop_server(
+    state: State<'_, Arc<Mutex<AppState>>>
+) -> Result<String, String> {
+    let mut st = state.inner().lock().await;
+    if let Some(tx) = st.server_abort.take() {
+        let _ = tx.send(());
+        st.server_port = None;
+        Ok("Server stopped".to_string())
+    } else {
+        Err("Server is not running".to_string())
+    }
 }
 
 #[command]

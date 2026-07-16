@@ -225,6 +225,17 @@ function App() {
     }
   };
 
+  const handleStopServer = async () => {
+    try {
+      await invoke('stop_server');
+      setIsServerRunning(false);
+      addLog('System', 'Server stopped');
+    } catch (e) {
+      console.error(e);
+      addLog('Error', `Failed to stop server: ${e}`);
+    }
+  };
+
   const handlePair = async () => {
     if (!targetIp) return;
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
@@ -476,13 +487,21 @@ function App() {
                   />
                 </div>
                 <div className="flex-1 flex items-end">
-                  <button
-                    onClick={handleStartServer}
-                    disabled={isServerRunning}
-                    className="w-full h-[46px] bg-primary hover:bg-primary-hover text-[#121212] rounded-xl font-bold disabled:opacity-50 disabled:bg-gray-700 disabled:text-gray-400 transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(250,204,21,0.2)]"
-                  >
-                    {isServerRunning ? <><CheckCircle2 className="w-4 h-4 text-[#121212]" /> Online</> : <><Play className="w-4 h-4" /> Start</>}
-                  </button>
+                  {isServerRunning ? (
+                    <button
+                      onClick={handleStopServer}
+                      className="w-full h-[46px] bg-red-500/20 hover:bg-red-500/30 text-red-400 border border-red-500/30 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(239,68,68,0.2)]"
+                    >
+                      <span className="w-2 h-2 rounded-full bg-red-400 animate-pulse"></span> Stop
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleStartServer}
+                      className="w-full h-[46px] bg-primary hover:bg-primary-hover text-[#121212] rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(250,204,21,0.2)]"
+                    >
+                      <Play className="w-4 h-4" /> Start
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -708,7 +727,7 @@ function App() {
           )}
 
           {/* Chat Box */}
-          <div className={`glass rounded-2xl p-0 flex flex-col flex-1 min-h-[300px] lg:flex ${mobileTab === 'transfer' ? 'flex' : 'hidden'} overflow-hidden`}>
+          <div className={`glass rounded-2xl p-0 flex flex-col flex-1 min-h-[300px] max-h-[500px] lg:flex ${mobileTab === 'transfer' ? 'flex' : 'hidden'} overflow-hidden`}>
             <div className="p-4 border-b border-white/5 bg-black/20">
               <h2 className="text-lg font-semibold text-white flex items-center gap-2">
                 <MessageSquare className="w-5 h-5 text-gray-400" /> Event Log & Chat

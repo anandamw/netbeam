@@ -17,6 +17,7 @@ pub fn run() {
     .manage(app_state)
     .invoke_handler(tauri::generate_handler![
         commands::start_server,
+        commands::stop_server,
         commands::connect_client,
         commands::send_message,
         commands::send_file,
