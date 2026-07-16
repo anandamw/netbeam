@@ -125,13 +125,22 @@ pub async fn send_file(app: AppHandle, ip: String, port: u16, file_path: String,
     
     let _ = app.emit("transfer-progress", ProgressEvent {
         transfer_id: transfer_id.clone(),
-        file_name,
-        sent_bytes,
+        file_name: file_name.clone(),
+        sent_bytes: file_size,
         total_bytes: file_size,
         percentage: 100.0,
         speed_mbps: speed,
         is_done: true,
     });
     
+    crate::store::add_history_record(crate::store::TransferRecord {
+        file_name: file_name.clone(),
+        file_size,
+        timestamp: chrono::Utc::now().to_rfc3339(),
+        peer: ip.clone(),
+        direction: "sent".to_string(),
+        status: "success".to_string(),
+    });
+
     Ok(())
 }

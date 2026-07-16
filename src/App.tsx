@@ -110,16 +110,8 @@ function App() {
       setProgresses(prev => ({ ...prev, [event.payload.transfer_id]: event.payload }));
       if (event.payload.is_done) {
         setIsTransferring(false);
-        const record = {
-          file_name: event.payload.file_name,
-          file_size: event.payload.total_bytes,
-          timestamp: new Date().toISOString(),
-          peer: 'Remote',
-          direction: 'completed',
-          status: 'success'
-        };
-        invoke('add_history_record', { record }).catch(console.error);
-        setHistory(prev => [record, ...prev].slice(0, 100));
+        // Refresh history from backend which now handles it accurately
+        invoke<any[]>('get_history').then(setHistory);
       }
     });
 
@@ -241,7 +233,13 @@ function App() {
     const pin = Math.floor(100000 + Math.random() * 900000).toString();
     setIsPairingWait({ ip: targetIp, pin });
     try {
-      const res = await invoke<string>('pair_device', { ip: targetIp, port: Number(targetPort), deviceName: myDeviceName, pin });
+      const res = await invoke<string>('pair_device', { 
+        ip: targetIp, 
+        port: Number(targetPort), 
+        deviceName: myDeviceName, 
+        pin,
+        targetDeviceName: targetName || 'Unknown Device'
+      });
       addLog('System', res);
       const trusted = await invoke<any[]>('get_trusted_devices');
       setTrustedDevices(trusted);

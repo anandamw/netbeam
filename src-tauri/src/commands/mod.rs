@@ -198,6 +198,7 @@ pub async fn pair_device(
     port: u16,
     device_name: String,
     pin: String,
+    target_device_name: String,
 ) -> Result<String, String> {
     use tokio::net::TcpStream;
     use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
@@ -230,7 +231,7 @@ pub async fn pair_device(
                 } else if ctrl.action == "accept" {
                     crate::store::add_trusted_device(crate::store::TrustedDevice {
                         ip: ip.clone(),
-                        name: "Paired Device".to_string(),
+                        name: target_device_name,
                     });
                     return Ok("Paired successfully!".to_string());
                 } else {

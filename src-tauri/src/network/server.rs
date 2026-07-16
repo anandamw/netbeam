@@ -224,6 +224,14 @@ pub async fn run_server(
                                         speed_mbps: speed,
                                         is_done: true,
                                     });
+                                    crate::store::add_history_record(crate::store::TransferRecord {
+                                        file_name: meta.file_name.clone(),
+                                        file_size: meta.file_size,
+                                        timestamp: chrono::Utc::now().to_rfc3339(),
+                                        peer: peer_clone.clone(),
+                                        direction: "received".to_string(),
+                                        status: "success".to_string(),
+                                    });
                                     let _ = app_clone.emit("network-message", (peer_clone.clone(), format!("File received successfully: {:?}", save_path)));
                                 } else {
                                     let _ = app_clone.emit("network-message", (peer_clone.clone(), format!("File size mismatch.")));
