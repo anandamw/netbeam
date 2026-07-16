@@ -480,7 +480,7 @@ function App() {
                 <FileIcon className="w-5 h-5" /> Select & Send File
               </button>
             </div>
-            
+
             {recentDevices.length > 0 && (
               <div className="mt-6 pt-5 border-t border-white/5 flex flex-wrap gap-2 items-center">
                 <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mr-2">Recent:</span>
@@ -645,6 +645,40 @@ function App() {
               </button>
             </div>
           </div>
+
+          </div>
+          
+          {/* Transfer History */}
+          {history.length > 0 && (
+            <div className="glass rounded-2xl flex-1 flex flex-col min-h-[250px] max-h-[400px] overflow-hidden">
+              <div className="p-4 border-b border-white/5 bg-black/20">
+                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <FileIcon className="w-5 h-5 text-primary" /> Transfer History
+                </h2>
+              </div>
+              <div className="flex-1 p-4 overflow-y-auto space-y-2 bg-black/10">
+                {history.map((record, i) => (
+                  <div key={i} className="bg-black/30 p-3 rounded-xl border border-white/5 flex items-center justify-between hover:bg-white/5 transition-colors">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${record.status === 'success' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                        {record.status === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                      </div>
+                      <div className="overflow-hidden">
+                        <div className="font-medium text-sm text-gray-200 truncate">{record.file_name}</div>
+                        <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-2">
+                           <span>{new Date(record.timestamp).toLocaleDateString()} {new Date(record.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                           <span>•</span>
+                           <span>{(record.file_size / 1048576).toFixed(1)} MB</span>
+                           <span>•</span>
+                           <span className="capitalize">{record.direction} {record.peer && `(${record.peer})`}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
         </div>
       </div>
