@@ -51,5 +51,7 @@ Pastikan Anda dan penerima file berada di jaringan Wi-Fi / LAN yang sama.
 
 <br>
 <div align="center">
-  Dibuat untuk memudahkan pertukaran data secara offline tanpa batas.
+  Dibuat untuk memudahkan pertukaran data secara offline tanpa batas.<br><br>
+  <strong>Dukung Pengembangan Netbeam:</strong><br>
+  <img src="src/assets/qris_donate.jpeg" alt="Donate QRIS" width="250" />
 </div>
