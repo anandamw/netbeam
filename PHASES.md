@@ -70,12 +70,12 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 ## Phase 6 - Advanced Features
 *Objective: Fitur tambahan untuk meningkatkan pengalaman pengguna.*
 
-- [ ] Multiple File Transfer
+- [x] Multiple File Transfer
 - [ ] Folder Transfer
 - [ ] Drag & Drop
 - [ ] Pause & Resume
 - [ ] Retry
-- [ ] Transfer queue
+- [x] Transfer queue
 
 ## Phase 7 - Security
 *Objective: Mengamankan koneksi dan transfer file.*
