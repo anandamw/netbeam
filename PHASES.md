@@ -72,9 +72,9 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 
 - [x] Multiple File Transfer
 - [ ] Folder Transfer
-- [ ] Drag & Drop
-- [ ] Pause & Resume
-- [ ] Retry
+- [x] Drag & Drop
+- [x] Pause & Resume
+- [x] Retry
 - [x] Transfer queue
 
 ## Phase 7 - Security

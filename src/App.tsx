@@ -39,15 +39,21 @@ function App() {
   const [progresses, setProgresses] = useState<Record<string, ProgressEvent>>({});
   const [discoveredDevices, setDiscoveredDevices] = useState<Record<string, DeviceInfo>>({});
   
-  // Phase 6: Transfer Queue
+  // Phase 6: Transfer Queue & Drag Drop
   const [transferQueue, setTransferQueue] = useState<string[]>([]);
   const [isTransferring, setIsTransferring] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  
+  // Phase 6: Pause, Resume, Retry
+  const [isQueuePaused, setIsQueuePaused] = useState(false);
+  const [failedTransfers, setFailedTransfers] = useState<string[]>([]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatLog]);
 
   useEffect(() => {
+    // Original listeners
     const unlistenServer = listen<number>('server-started', async (event) => {
       setIsServerRunning(true);
       setActualPort(event.payload);
@@ -67,25 +73,42 @@ function App() {
     });
 
     const unlistenProgress = listen<ProgressEvent>('transfer-progress', (event) => {
-      setProgresses(prev => ({
-        ...prev,
-        [event.payload.transfer_id]: event.payload
-      }));
-      
-      // If a file transfer finishes, free up the queue
+      setProgresses(prev => ({ ...prev, [event.payload.transfer_id]: event.payload }));
       if (event.payload.is_done) {
         setIsTransferring(false);
       }
     });
 
     const unlistenDiscovery = listen<DeviceInfo>('device-discovered', (event) => {
-      setDiscoveredDevices(prev => {
-        const key = `${event.payload.ip}:${event.payload.port}`;
-        return {
-          ...prev,
-          [key]: event.payload
-        };
-      });
+      setDiscoveredDevices(prev => ({
+        ...prev,
+        [`${event.payload.ip}:${event.payload.port}`]: event.payload
+      }));
+    });
+
+    // Tauri window drag and drop listeners
+    const unlistenDragEnter = listen('tauri://drag-enter', () => {
+      setIsDragging(true);
+    });
+
+    const unlistenDragLeave = listen('tauri://drag-leave', () => {
+      setIsDragging(false);
+    });
+
+    const unlistenDragDrop = listen<{ paths: string[] }>('tauri://drag-drop', (event) => {
+      setIsDragging(false);
+      
+      let paths: string[] = [];
+      if (event.payload && Array.isArray(event.payload.paths)) {
+        paths = event.payload.paths;
+      } else if (Array.isArray(event.payload)) {
+        paths = event.payload as unknown as string[];
+      }
+      
+      if (paths.length > 0) {
+        setTransferQueue(prev => [...prev, ...paths]);
+        addLog('System', `Added ${paths.length} file(s) via Drag & Drop.`);
+      }
     });
 
     return () => {
@@ -93,12 +116,15 @@ function App() {
       unlistenMessage.then(f => f());
       unlistenProgress.then(f => f());
       unlistenDiscovery.then(f => f());
+      unlistenDragEnter.then(f => f());
+      unlistenDragLeave.then(f => f());
+      unlistenDragDrop.then(f => f());
     };
   }, [myDeviceName]);
 
   // Queue Processing Engine
   useEffect(() => {
-    if (!isTransferring && transferQueue.length > 0 && targetIp) {
+    if (!isTransferring && transferQueue.length > 0 && targetIp && !isQueuePaused) {
       const nextFile = transferQueue[0];
       setTransferQueue(prev => prev.slice(1));
       setIsTransferring(true);
@@ -113,14 +139,15 @@ function App() {
           });
         } catch (e) {
           console.error(e);
-          addLog('Error', `Send failed for ${nextFile}: ${e}`);
+          addLog('Error', `Send failed for ${nextFile.split('\\').pop() || nextFile.split('/').pop()}: ${e}`);
+          setFailedTransfers(prev => [...prev, nextFile]);
           setIsTransferring(false); // Move to next on error
         }
       };
       
       sendNext();
     }
-  }, [isTransferring, transferQueue, targetIp, targetPort]);
+  }, [isTransferring, transferQueue, targetIp, targetPort, isQueuePaused]);
 
   const addLog = (sender: string, msg: string) => {
     const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -187,6 +214,20 @@ function App() {
 
   return (
     <div className="min-h-screen p-6 md:p-10 max-w-7xl mx-auto flex flex-col gap-8 relative z-10">
+      
+      {/* Drag & Drop Overlay */}
+      {isDragging && (
+        <div className="fixed inset-0 z-50 bg-primary/10 backdrop-blur-sm border-[6px] border-dashed border-primary flex items-center justify-center pointer-events-none transition-all duration-300">
+          <div className="bg-black/80 px-10 py-8 rounded-2xl flex flex-col items-center gap-4 shadow-2xl shadow-primary/20">
+            <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center animate-bounce">
+              <FileIcon className="w-10 h-10 text-primary" />
+            </div>
+            <h2 className="text-3xl font-bold text-white">Drop File(s) Here</h2>
+            <p className="text-gray-400">Release to add to the transfer queue</p>
+          </div>
+        </div>
+      )}
+
       <header className="flex items-center justify-between pb-4 border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shadow-lg shadow-primary/20 animate-float">
@@ -349,15 +390,25 @@ function App() {
           </div>
 
           {/* Transfers in Progress */}
-          {(Object.values(progresses).length > 0 || transferQueue.length > 0) && (
+          {(Object.values(progresses).length > 0 || transferQueue.length > 0 || failedTransfers.length > 0) && (
             <div className="glass rounded-2xl p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-lg font-semibold text-white">Active Transfers</h2>
-                {transferQueue.length > 0 && (
-                   <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-xs font-semibold animate-pulse">
-                     {transferQueue.length} file(s) in queue...
-                   </span>
-                )}
+                <div className="flex items-center gap-2">
+                  {transferQueue.length > 0 && (
+                     <span className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${isQueuePaused ? 'bg-orange-500/20 text-orange-400' : 'bg-primary/20 text-primary animate-pulse'}`}>
+                       {transferQueue.length} file(s) in queue
+                     </span>
+                  )}
+                  {transferQueue.length > 0 && (
+                    <button
+                      onClick={() => setIsQueuePaused(!isQueuePaused)}
+                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all flex items-center gap-1 ${isQueuePaused ? 'bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/30' : 'bg-gray-800 text-gray-300 border-white/10 hover:bg-gray-700'}`}
+                    >
+                      {isQueuePaused ? '▶ Resume' : '⏸ Pause'}
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="space-y-4">
                 {Object.values(progresses).map(p => (
@@ -396,6 +447,33 @@ function App() {
                     </div>
                   </div>
                 ))}
+                
+                {failedTransfers.length > 0 && failedTransfers.map((path, idx) => {
+                   const fileName = path.split('\\').pop() || path.split('/').pop();
+                   return (
+                     <div key={`failed-${idx}`} className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 relative overflow-hidden flex justify-between items-center">
+                       <div className="flex items-center gap-3 overflow-hidden">
+                         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-red-500/20 text-red-400">
+                           <AlertCircle className="w-4 h-4" />
+                         </div>
+                         <div>
+                           <span className="font-medium text-gray-200 block truncate">{fileName}</span>
+                           <span className="text-xs text-red-400">Transfer failed</span>
+                         </div>
+                       </div>
+                       <button
+                         onClick={() => {
+                           setFailedTransfers(prev => prev.filter((_, i) => i !== idx));
+                           setTransferQueue(prev => [...prev, path]);
+                           addLog('System', `Retrying file: ${fileName}`);
+                         }}
+                         className="px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors border border-red-500/20 shrink-0"
+                       >
+                         <Play className="w-3 h-3" /> Retry
+                       </button>
+                     </div>
+                   );
+                })}
               </div>
             </div>
           )}
