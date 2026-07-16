@@ -21,7 +21,7 @@ pub struct RecentDevice {
 
 fn get_data_dir() -> PathBuf {
     let mut path = dirs::data_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push("LANShare");
+    path.push("Netbeam");
     if !path.exists() {
         let _ = fs::create_dir_all(&path);
     }

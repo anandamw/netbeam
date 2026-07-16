@@ -86,7 +86,7 @@ Inspirasi aplikasi:
 # 4. Folder Structure
 
 ```text
-lan-share/
+netbeam/
 
 ├── src/
 │
