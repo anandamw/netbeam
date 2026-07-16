@@ -88,17 +88,18 @@ Dokumen ini berisi daftar centang (checklist) untuk setiap fase pengembangan apl
 - [ ] Trusted device list
 
 ## Phase 8 - History
-*Objective: Mencatat riwayat transfer.*
+*Objective: Pencatatan riwayat transfer lokal.*
 
-- [ ] Transfer History (disimpan lokal)
-- [ ] Recent Device
+- [x] Transfer History (disimpan lokal)
+- [x] Recent Device
 - [ ] Search
 - [ ] Filter
 
 ## Phase 9 - Packaging & Release
-*Objective: Mempersiapkan aplikasi untuk rilis.*
+*Objective: Distribusi aplikasi.*
 
-- [ ] Tauri bundler config untuk OS (Windows, macOS, Linux)
-- [ ] Code signing
-- [ ] Auto-update via Tauri updater plugin
+- [x] Tauri bundler config
+- [ ] Code signing (opsional)
+- [ ] Auto-update via Tauri updater
+- [ ] Cross-platform compilation (Windows, macOS, Linux, Android)
 - [ ] Versioning & changelog (semver)

@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "shareDesk",
-  "version": "0.1.0",
-  "identifier": "com.tauri.dev",
+  "productName": "LAN Share",
+  "version": "1.0.0",
+  "identifier": "com.anandamw.lanshare",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "LAN Share",
-        "width": 800,
-        "height": 600,
+        "width": 1100,
+        "height": 800,
         "resizable": true,
         "fullscreen": false
       }

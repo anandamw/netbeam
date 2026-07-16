@@ -25,12 +25,12 @@ interface DeviceInfo {
 function App() {
   const [serverPort, setServerPort] = useState<number>(3000);
   const [isServerRunning, setIsServerRunning] = useState(false);
-  const [actualPort, setActualPort] = useState<number | null>(null);
+  const [, setActualPort] = useState<number | null>(null);
   const [myDeviceName, setMyDeviceName] = useState('My PC');
 
   const [targetIp, setTargetIp] = useState('');
   const [targetPort, setTargetPort] = useState<number>(3000);
-  const [targetName, setTargetName] = useState('');
+  const [, setTargetName] = useState('');
 
   const [msgToSend, setMsgToSend] = useState('');
   const [chatLog, setChatLog] = useState<{ sender: string, msg: string, time: string }[]>([]);
@@ -602,7 +602,6 @@ function App() {
                 </div>
               ) : (
                 chatLog.map((log, i) => {
-                  const isSystem = log.sender === 'System' || log.sender === 'Error';
                   const isMe = log.sender === 'Me';
 
                   return (
@@ -646,8 +645,6 @@ function App() {
             </div>
           </div>
 
-          </div>
-          
           {/* Transfer History */}
           {history.length > 0 && (
             <div className="glass rounded-2xl flex-1 flex flex-col min-h-[250px] max-h-[400px] overflow-hidden">
@@ -666,11 +663,11 @@ function App() {
                       <div className="overflow-hidden">
                         <div className="font-medium text-sm text-gray-200 truncate">{record.file_name}</div>
                         <div className="text-[11px] text-gray-500 mt-0.5 flex items-center gap-2">
-                           <span>{new Date(record.timestamp).toLocaleDateString()} {new Date(record.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                           <span>•</span>
-                           <span>{(record.file_size / 1048576).toFixed(1)} MB</span>
-                           <span>•</span>
-                           <span className="capitalize">{record.direction} {record.peer && `(${record.peer})`}</span>
+                          <span>{new Date(record.timestamp).toLocaleDateString()} {new Date(record.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          <span>•</span>
+                          <span>{(record.file_size / 1048576).toFixed(1)} MB</span>
+                          <span>•</span>
+                          <span className="capitalize">{record.direction} {record.peer && `(${record.peer})`}</span>
                         </div>
                       </div>
                     </div>
