@@ -695,7 +695,7 @@ function App() {
                 ))}
 
                 {failedTransfers.length > 0 && failedTransfers.map((path, idx) => {
-                  const fileName = path.split('\\').pop() || path.split('/').pop();
+                  const fileName = path.split('\\').pop() || path.split('/').pop() || 'unknown';
                   return (
                     <div key={`failed-${idx}`} className="bg-red-500/10 p-4 rounded-xl border border-red-500/20 relative overflow-hidden flex justify-between items-center">
                       <div className="flex items-center gap-3 overflow-hidden">
